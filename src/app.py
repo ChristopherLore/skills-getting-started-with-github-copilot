@@ -104,10 +104,33 @@ def signup_for_activity(activity_name: str, email: str):
     # Get the specific activity
     activity = activities[activity_name]
 
-    # Check if student is already signed up
-    if email in activity["participants"]:
+    # Normalize email for consistent deduplication
+    email_norm = email.strip().lower()
+
+    # Check if student is already signed up (case-insensitive)
+    if any(p.strip().lower() == email_norm for p in activity["participants"]):
         raise HTTPException(status_code=400, detail="Student already signed up")
 
-    # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+    # Add student (store normalized email)
+    activity["participants"].append(email_norm)
+    return {"message": f"Signed up {email_norm} for {activity_name}"}
+
+
+@app.delete("/activities/{activity_name}/participants")
+def remove_participant(activity_name: str, email: str):
+    """Unregister a student from an activity"""
+    # Validate activity exists
+    if activity_name not in activities:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    activity = activities[activity_name]
+
+    # Normalize incoming email and find matching participant (case-insensitive)
+    email_norm = email.strip().lower()
+    match_index = next((i for i, p in enumerate(activity["participants"]) if p.strip().lower() == email_norm), None)
+
+    if match_index is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    removed = activity["participants"].pop(match_index)
+    return {"message": f"Removed {removed} from {activity_name}"}
